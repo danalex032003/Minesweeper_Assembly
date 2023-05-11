@@ -5,6 +5,7 @@ includelib msvcrt.lib
 extern exit: proc
 extern malloc: proc
 extern memset: proc
+extern printf: proc
 
 includelib canvas.lib
 extern BeginDrawing: proc
@@ -14,6 +15,10 @@ extern BeginDrawing: proc
 public start
 
 .data
+
+format db "%d ", 0
+constant dd 0
+
 
 _WINDOW_TITLE DB "Minesweeper", 0
 AREA_WIDTH EQU 720
@@ -47,10 +52,31 @@ MATRIX_X EQU 100
 MATRIX_Y EQU 100
 CELL_WIDTH_AND_HEIGHT EQU 25
 NUMBER_OF_CELLS EQU 20
+matrix DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 
 
 include digits.inc
 include letters.inc
+include mine.inc
 
 .code
 ; procedura make_text afiseaza o litera sau o cifra la coordonatele date
@@ -58,6 +84,16 @@ include letters.inc
 ; arg2 - pointer la vectorul de pixeli
 ; arg3 - pos_x
 ; arg4 - pos_y
+
+make_matrix_proc macro numberOfMines
+	
+	mov ecx, numberOfMines * numberOfMines
+	assign_bombs_loop:
+		mov dword ptr [matrix + ECX * 8], -1
+		loop assign_bombs_loop
+		
+	
+endm
 
 make_text proc
 	push ebp
@@ -80,9 +116,15 @@ make_digit:
 	sub eax, '0'
 	lea esi, digits
 	jmp draw_text
-make_space:	
+make_space:
+	cmp eax, ' '
+	jnz make_mine
 	mov eax, 26 ; de la 0 pana la 25 sunt litere, 26 e space
 	lea esi, letters
+make_mine:
+	mov eax, 0
+	lea esi, mine
+	mov edx, -1
 	
 draw_text:
 	mov ebx, symbol_width
@@ -279,6 +321,24 @@ draw_proc proc
 		make_text_macro 'E', area, 390, 20
 		make_text_macro 'R', area, 400, 20
 		
+	make_matrix_proc 20
+	
+	mov ecx, NUMBER_OF_CELLS*NUMBER_OF_CELLS
+	loop_for_matrix:
+		mov eax, dword ptr [matrix + ecx*4]
+		cmp eax, -1
+		mov ebx, ecx
+		imul ebx, ecx
+		mov constant, ebx
+		jnz is_not_mine
+		make_text_macro '_', area, 100 + constant, 100 + constant
+		jmp end_if
+		is_not_mine:
+		make_text_macro '1', area, 100 + constant, 100
+		end_if:
+		loop loop_for_matrix
+		mov ecx, NUMBER_OF_CELLS*NUMBER_OF_CELLS
+
 	afisare_linii_orizontale:
 	
 		mov ecx, -1
@@ -299,6 +359,25 @@ draw_proc proc
 	___________test____________:
 		draw_vertical_line_macro 100, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
 		draw_vertical_line_macro 125, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
+		draw_vertical_line_macro 150, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
+		draw_vertical_line_macro 175, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
+		draw_vertical_line_macro 200, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
+		draw_vertical_line_macro 225, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
+		draw_vertical_line_macro 250, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
+		draw_vertical_line_macro 275, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
+		draw_vertical_line_macro 300, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
+		draw_vertical_line_macro 325, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
+		draw_vertical_line_macro 350, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
+		draw_vertical_line_macro 375, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
+		draw_vertical_line_macro 400, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
+		draw_vertical_line_macro 425, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
+		draw_vertical_line_macro 450, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
+		draw_vertical_line_macro 475, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
+		draw_vertical_line_macro 500, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
+		draw_vertical_line_macro 525, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
+		draw_vertical_line_macro 550, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
+		draw_vertical_line_macro 575, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
+		draw_vertical_line_macro 600, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
 			
 	afisare_linii_verticale:
 		mov ecx, -1
@@ -319,8 +398,8 @@ draw_proc proc
 ; patrat:
 	; draw_horizontal_line_macro buton_x, buton_y, button_size, 0
 	; draw_horizontal_line_macro buton_x, buton_y + button_size, button_size, 0
-	 draw_vertical_line_macro buton_x, buton_y, button_size, 0
-	 draw_vertical_line_macro buton_x + button_size, buton_y, button_size, 0
+	;draw_vertical_line_macro buton_x, buton_y, button_size, 0
+	;draw_vertical_line_macro buton_x + button_size, buton_y, button_size, 0
 
 		
 	
@@ -331,9 +410,10 @@ final_draw:
 	ret
 
 draw_proc endp
-	
+
 
 start:
+
 
 	mov eax, AREA_WIDTH
 	mov ebx, AREA_HEIGHT
@@ -344,8 +424,13 @@ start:
 	add ESP, 4
 	mov area, eax
 	
-	;mov ebx, [_ROWS]
-	;mov ecx, [_COLUMNS]
+	; mov eax, NUMBER_OF_CELLS
+	; mov ebx, NUMBER_OF_CELLS
+	; mul ebx
+	; call malloc
+	; add esp, 4
+	; mov matrix, eax
+	
 	
 	push offset draw_proc
 	push area
@@ -354,6 +439,8 @@ start:
 	push offset _WINDOW_TITLE
 	call BeginDrawing
 	add esp, 20
+	
+	
 
 	push 0
 	call exit
