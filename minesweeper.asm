@@ -1,4 +1,5 @@
 .386
+.586
 .model flat, stdcall
 
 includelib msvcrt.lib
@@ -15,14 +16,13 @@ extern BeginDrawing: proc
 public start
 
 .data
-
+eax_format db "eax = %d ", 0
 format db "%d ", 0
-constant dd 0
-
+new_line_format db " ", 0Ah, 0
 
 _WINDOW_TITLE DB "Minesweeper", 0
-AREA_WIDTH EQU 720
-AREA_HEIGHT EQU 720
+AREA_WIDTH EQU 800
+AREA_HEIGHT EQU 600
 
 area DD 0
 counter DD 0
@@ -35,11 +35,6 @@ arg4 EQU 20
 symbol_width EQU 10
 symbol_height EQU 20
 
-_ROWS DW 10
-_COLUMNS DW 10
-
-ONE_SEC EQU 1000
-
 RED EQU 0FF0000h
 BLACK EQU 0
 
@@ -50,29 +45,13 @@ button_size EQU 100
 
 MATRIX_X EQU 100
 MATRIX_Y EQU 100
-CELL_WIDTH_AND_HEIGHT EQU 25
-NUMBER_OF_CELLS EQU 20
-matrix DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	   DD 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+CELL_WIDTH EQU 30
+CELL_HEIGHT EQU 20
+number_of_horizontal_cells EQU 20
+number_of_vertical_cells EQU 20
+matrix DD 0
 
+dir dd -4, -84, -80, -76, 4, 84, 80, 76
 
 include digits.inc
 include letters.inc
@@ -85,14 +64,178 @@ include mine.inc
 ; arg3 - pos_x
 ; arg4 - pos_y
 
-make_matrix_proc macro numberOfMines
+
+make_matrix_proc macro numberOfMines, _height, _width
+	local i_loop, j_loop, check, assign_mines_loop, i_assign_values_loop, j_assign_values_loop, loop_test, west, north_west, north, north_east, east, south_east, south, south_west, skip
+	xor ecx, ecx
+	i_loop:
+		xor edx, edx
+		j_loop:
+			mov eax, number_of_vertical_cells
+			imul eax, edx
+			add eax, ecx
+			mov dword ptr [matrix + eax * 4], 0
+			inc edx
+			cmp edx, number_of_vertical_cells
+			jl j_loop
+		inc ecx
+		cmp ecx, number_of_horizontal_cells
+		jl i_loop
 	
-	mov ecx, numberOfMines * numberOfMines
-	assign_bombs_loop:
-		mov dword ptr [matrix + ECX * 8], -1
-		loop assign_bombs_loop
+	
+	xor ecx, ecx
+	assign_mines_loop:
+		rdtsc
+		mov ebx, number_of_horizontal_cells * number_of_vertical_cells - 1
+		xor edx, edx
+		div ebx
 		
+		cmp dword ptr [matrix + edx * 4], -1
+		je next
+		mov dword ptr [matrix + edx * 4], -1
+		inc ecx
+		next:
+		cmp ecx, numberOfMines
+		jl assign_mines_loop
+		
+		
+	; mov dword ptr [dir], -4
+	; mov dword ptr [dir + 4], -84
+	; mov dword ptr [dir + 8], -60
+	; mov dword ptr [dir + 12], -76
+	; mov dword ptr [dir + 16], 4
+	; mov dword ptr [dir + 20], 84
+	; mov dword ptr [dir + 24], 80
+	; mov dword ptr [dir + 28], 76
 	
+	mov dword ptr [matrix + 19*4], -1
+	
+	xor ecx, ecx
+	i_assign_values_loop:
+		xor edx, edx
+		j_assign_values_loop:
+			mov eax, ecx
+			imul eax, number_of_vertical_cells
+			add eax, edx
+			imul eax, 4
+			
+			cmp dword ptr [matrix + eax], -1; daca este bomba dam skip
+			je skip
+			
+			west:
+			cmp edx, 0; daca nu suntem in matrice dam skip
+			je north_west
+			cmp dword ptr [matrix + eax - 4], -1; daca nu este bomba in vest dam skip
+			jne north_west
+			;toate conditiile au fost indeplinite
+			inc dword ptr [matrix + eax]
+			
+			north_west:
+			cmp edx, 0
+			je north
+			cmp ecx, 0
+			je north
+			cmp dword ptr [matrix + eax - 84], -1; daca nu este bomba in vest dam skip
+			jne north
+			;toate conditiile au fost indeplinite
+			inc dword ptr [matrix + eax]
+			
+			north:
+			cmp ecx, 0
+			je north_east
+			cmp dword ptr [matrix + eax - 80], -1; daca nu este bomba in vest dam skip
+			jne north_east
+			;toate conditiile au fost indeplinite
+			inc dword ptr [matrix + eax]
+			
+			north_east:
+			cmp edx, number_of_vertical_cells - 1 
+			je east
+			cmp ecx, 0
+			je east
+			cmp dword ptr [matrix + eax - 76], -1; daca nu este bomba in vest dam skip
+			jne east
+			;toate conditiile au fost indeplinite
+			inc dword ptr [matrix + eax]
+			
+			east:
+			cmp edx, number_of_vertical_cells - 1
+			je south_east
+			cmp dword ptr [matrix + eax + 4], -1; daca nu este bomba in vest dam skip
+			jne south_east
+			;toate conditiile au fost indeplinite
+			inc dword ptr [matrix + eax]
+			
+			south_east:
+			cmp edx, number_of_vertical_cells
+			je south
+			cmp ecx, number_of_horizontal_cells
+			je south
+			cmp dword ptr [matrix + eax + 84], -1; daca nu este bomba in vest dam skip
+			jne south
+			;toate conditiile au fost indeplinite
+			inc dword ptr [matrix + eax]
+			
+			south:
+			cmp ecx, number_of_horizontal_cells - 1
+			je south_west
+			cmp dword ptr [matrix + eax + 80], -1; daca nu este bomba in vest dam skip
+			jne south_west
+			;toate conditiile au fost indeplinite
+			inc dword ptr [matrix + eax]
+			
+			south_west:
+			cmp edx, 0
+			je skip
+			cmp ecx, number_of_horizontal_cells - 1
+			je skip
+			cmp dword ptr [matrix + eax + 76], -1; daca nu este bomba in vest dam skip
+			jne skip
+			;toate conditiile au fost indeplinite
+			inc dword ptr [matrix + eax]
+			
+			
+			skip:
+			inc edx
+			
+			cmp edx, number_of_vertical_cells
+			jl j_assign_values_loop
+		
+		
+		inc ecx
+		cmp ecx, number_of_horizontal_cells
+		jl i_assign_values_loop
+		
+	xor ecx, ecx
+	i_loop_test:
+		xor edx, edx
+		
+		j_loop_test:
+		
+			pusha
+			mov eax, number_of_vertical_cells
+			imul eax, ecx
+			add eax, edx
+			push dword ptr [matrix + eax * 4]
+			push offset format
+			call printf
+			add esp, 8
+			popa
+			inc edx
+			cmp edx, number_of_vertical_cells
+			jl j_loop_test
+			
+			
+			pusha
+			push offset new_line_format
+			call printf
+			add esp, 4
+			popa
+			
+		inc ecx
+		cmp ecx, number_of_horizontal_cells
+		jl i_loop_test
+
 endm
 
 make_text proc
@@ -134,7 +277,7 @@ draw_text:
 	add esi, eax
 	mov ecx, symbol_height
 bucla_simbol_linii:
-	mov edi, [ebp+arg2] ; pointer la matricea de pixeli
+	mov edi, [ebp+arg2] ; pointer la matrix de pixeli
 	mov eax, [ebp+arg4] ; pointer la coord y
 	add eax, symbol_height
 	sub eax, ecx
@@ -163,6 +306,12 @@ simbol_pixel_next:
 	pop ebp
 	ret
 make_text endp
+
+draw_on_center macro start_x, start_y, end_x, end_y
+	local
+	
+
+endm
 
 ; un macro ca sa apelam mai usor desenarea simbolului
 make_text_macro macro symbol, drawArea, x, y
@@ -284,9 +433,9 @@ draw_proc proc
 		
 	timer_event:
 		inc counter
-		; mov eax, counter
-		; cmp eax, 30
-		; jz button_fail
+		
+	
+	
 	
 	afisare_litere:
 		;afisam valoarea counter-ului curent (sute, zeci si unitati)
@@ -320,79 +469,71 @@ draw_proc proc
 		make_text_macro 'P', area, 380, 20
 		make_text_macro 'E', area, 390, 20
 		make_text_macro 'R', area, 400, 20
-		
-	make_matrix_proc 20
 	
-	mov ecx, NUMBER_OF_CELLS*NUMBER_OF_CELLS
-	loop_for_matrix:
-		mov eax, dword ptr [matrix + ecx*4]
-		cmp eax, -1
-		mov ebx, ecx
-		imul ebx, ecx
-		mov constant, ebx
-		jnz is_not_mine
-		make_text_macro '_', area, 100 + constant, 100 + constant
-		jmp end_if
-		is_not_mine:
-		make_text_macro '1', area, 100 + constant, 100
-		end_if:
-		loop loop_for_matrix
-		mov ecx, NUMBER_OF_CELLS*NUMBER_OF_CELLS
-
+	
+	
 	afisare_linii_orizontale:
 	
 		mov ecx, -1
-		mov ebx, CELL_WIDTH_AND_HEIGHT
+		mov ebx, CELL_HEIGHT
+		
 		loop_for_horizontal_lines:
 			inc ecx
+			xor edx, edx
 			mov eax, ecx
 			mul ebx
 			add eax, MATRIX_Y
 			
 			pusha
-			draw_horizontal_line_macro MATRIX_X, eax, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
+			draw_horizontal_line_macro MATRIX_X, eax, number_of_vertical_cells * CELL_WIDTH, BLACK
 			popa
-			cmp ecx, NUMBER_OF_CELLS
+			
+			cmp ecx, number_of_vertical_cells
 			jl loop_for_horizontal_lines
 			
 			
 	___________test____________:
-		draw_vertical_line_macro 100, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
-		draw_vertical_line_macro 125, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
-		draw_vertical_line_macro 150, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
-		draw_vertical_line_macro 175, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
-		draw_vertical_line_macro 200, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
-		draw_vertical_line_macro 225, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
-		draw_vertical_line_macro 250, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
-		draw_vertical_line_macro 275, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
-		draw_vertical_line_macro 300, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
-		draw_vertical_line_macro 325, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
-		draw_vertical_line_macro 350, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
-		draw_vertical_line_macro 375, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
-		draw_vertical_line_macro 400, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
-		draw_vertical_line_macro 425, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
-		draw_vertical_line_macro 450, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
-		draw_vertical_line_macro 475, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
-		draw_vertical_line_macro 500, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
-		draw_vertical_line_macro 525, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
-		draw_vertical_line_macro 550, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
-		draw_vertical_line_macro 575, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
-		draw_vertical_line_macro 600, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
+		draw_horizontal_line_macro MATRIX_X, 99, number_of_horizontal_cells * CELL_WIDTH + 2, BLACK
+		draw_horizontal_line_macro MATRIX_X - 1, 501, number_of_horizontal_cells * CELL_WIDTH + 2, BLACK
+		draw_vertical_line_macro 99, MATRIX_Y, number_of_horizontal_cells * CELL_HEIGHT + 2, BLACK
+		draw_vertical_line_macro 100, MATRIX_Y, number_of_horizontal_cells * CELL_HEIGHT, BLACK
+		draw_vertical_line_macro 130, MATRIX_Y, number_of_horizontal_cells * CELL_HEIGHT, BLACK
+		draw_vertical_line_macro 160, MATRIX_Y, number_of_horizontal_cells * CELL_HEIGHT, BLACK
+		draw_vertical_line_macro 190, MATRIX_Y, number_of_horizontal_cells * CELL_HEIGHT, BLACK
+		draw_vertical_line_macro 220, MATRIX_Y, number_of_horizontal_cells * CELL_HEIGHT, BLACK
+		draw_vertical_line_macro 250, MATRIX_Y, number_of_horizontal_cells * CELL_HEIGHT, BLACK
+		draw_vertical_line_macro 280, MATRIX_Y, number_of_horizontal_cells * CELL_HEIGHT, BLACK
+		draw_vertical_line_macro 310, MATRIX_Y, number_of_horizontal_cells * CELL_HEIGHT, BLACK
+		draw_vertical_line_macro 340, MATRIX_Y, number_of_horizontal_cells * CELL_HEIGHT, BLACK
+		draw_vertical_line_macro 370, MATRIX_Y, number_of_horizontal_cells * CELL_HEIGHT, BLACK
+		draw_vertical_line_macro 400, MATRIX_Y, number_of_horizontal_cells * CELL_HEIGHT, BLACK
+		draw_vertical_line_macro 430, MATRIX_Y, number_of_horizontal_cells * CELL_HEIGHT, BLACK
+		draw_vertical_line_macro 460, MATRIX_Y, number_of_horizontal_cells * CELL_HEIGHT, BLACK
+		draw_vertical_line_macro 490, MATRIX_Y, number_of_horizontal_cells * CELL_HEIGHT, BLACK
+		draw_vertical_line_macro 520, MATRIX_Y, number_of_horizontal_cells * CELL_HEIGHT, BLACK
+		draw_vertical_line_macro 550, MATRIX_Y, number_of_horizontal_cells * CELL_HEIGHT, BLACK
+		draw_vertical_line_macro 580, MATRIX_Y, number_of_horizontal_cells * CELL_HEIGHT, BLACK
+		draw_vertical_line_macro 610, MATRIX_Y, number_of_horizontal_cells * CELL_HEIGHT, BLACK
+		draw_vertical_line_macro 640, MATRIX_Y, number_of_horizontal_cells * CELL_HEIGHT, BLACK
+		draw_vertical_line_macro 670, MATRIX_Y, number_of_horizontal_cells * CELL_HEIGHT, BLACK
+		draw_vertical_line_macro 700, MATRIX_Y, number_of_horizontal_cells * CELL_HEIGHT, BLACK
+		draw_vertical_line_macro 701, MATRIX_Y, number_of_horizontal_cells * CELL_HEIGHT + 2, BLACK
 			
-	afisare_linii_verticale:
-		mov ecx, -1
-		mov ebx, CELL_WIDTH_AND_HEIGHT
-		loop_for_vertical_lines:
-			inc ecx
-			mov eax, ecx
-			mul ebx
-			add eax, MATRIX_X
+	; afisare_linii_verticale:
+		; mov ecx, -1
+		; mov ebx, CELL_WIDTH
+		; loop_for_vertical_lines:
+			; inc ecx
+			; xor edx, edx
+			; mov eax, ecx
+			; mul ebx
+			; add eax, MATRIX_X
 			
-			pusha
-			draw_vertical_line_macro eax, MATRIX_Y, NUMBER_OF_CELLS * CELL_WIDTH_AND_HEIGHT, BLACK
-			popa
-			cmp ecx, NUMBER_OF_CELLS
-			jl loop_for_vertical_lines
+			; pusha
+			; draw_vertical_line_macro eax, MATRIX_Y, number_of_horizontal_cells * CELL_HEIGHT, BLACK
+			; popa
+			; cmp ecx, number_of_horizontal_cells
+			; jl loop_for_vertical_lines
 		
 		
 ; patrat:
@@ -414,7 +555,6 @@ draw_proc endp
 
 start:
 
-
 	mov eax, AREA_WIDTH
 	mov ebx, AREA_HEIGHT
 	mul ebx
@@ -424,12 +564,53 @@ start:
 	add ESP, 4
 	mov area, eax
 	
-	; mov eax, NUMBER_OF_CELLS
-	; mov ebx, NUMBER_OF_CELLS
-	; mul ebx
-	; call malloc
-	; add esp, 4
-	; mov matrix, eax
+	xor edx, edx
+	mov eax, number_of_horizontal_cells
+	mov ebx, number_of_vertical_cells
+	mul ebx
+	call malloc
+	add esp, 4
+	mov matrix, eax
+	
+	; mov dir[0], -4 ; west
+	; mov eax, number_of_vertical_cells
+	; imul eax, 4
+	; neg eax
+	; sub eax, 4
+	; mov dir[1], eax ; north-west
+	; add eax, 4
+	; mov dir[2], eax ; north
+	; add eax, 4
+	; mov dir[3], eax ; north-east
+	; mov dir[4], 4 ; east
+	; mov eax, number_of_vertical_cells
+	; imul eax, 4
+	; add eax, 4
+	; mov dir[5], eax ; south-east
+	; sub eax, 4
+	; mov dir[6], eax	; south
+	; sub eax, 4
+	; mov dir[7], eax ; south-west
+	
+	
+	; pusha
+	; push dir[6]
+	; push offset format
+	; add esp, 8
+	; popa
+	
+	pusha
+	make_matrix_proc 60, 20, 20
+	popa
+	
+	
+	; pusha
+	; push dword ptr [matrix + 181*4]
+	; push offset format
+	; call printf
+	; add esp, 8
+	; popa
+	
 	
 	
 	push offset draw_proc
