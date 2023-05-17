@@ -11,12 +11,11 @@ extern printf: proc
 includelib canvas.lib
 extern BeginDrawing: proc
 
-;include Irvine32.lib
-
 public start
 
 .data
 eax_format db "eax = %d ", 0
+test_format db "test = %d ", 0
 format db "%d ", 0
 new_line_format db " ", 0Ah, 0
 
@@ -355,6 +354,45 @@ local loop_for_line
 		loop loop_for_line
 endm
 
+get_cell_number_macro macro x, y
+	
+	mov eax, x
+	sub eax, 100
+	xor edx, edx
+	mov ebx, CELL_WIDTH
+	div ebx
+	
+	push eax
+	
+	mov eax, y
+	sub eax, 100
+	xor edx, edx
+	mov ebx, CELL_HEIGHT
+	div ebx
+	
+	push eax
+	; pusha
+	; push eax
+	; push offset test_format
+	; call printf
+	; add esp, 8
+	; popa
+	
+endm
+
+get_symbol_from_click_macro macro x_cell, y_cell
+	
+	mov eax, x_cell
+	imul eax, 4
+	mov ebx, y_cell
+	imul ebx, 4
+	add eax, ebx
+	push eax
+	
+	
+	
+endm
+
 ; sau la fiecare interval de 200ms in care nu s-a dat click
 ; arg1 - evt (0 - initializare, 1 - click, 2 - s-a scurs intervalul fara click, 3 - s-a apasat o tasta)
 ; arg2 - x (in cazul apasarii unei taste, x contine codul ascii al tastei care a fost apasata)
@@ -384,6 +422,60 @@ draw_proc proc
 	jmp afisare_litere
 		
 	click_event:
+	
+		; pusha
+		; push [ebp + arg2]
+		; push offset test_format
+		; call printf
+		; add esp, 8
+		; popa
+		mov eax, [ebp + arg3] ; y
+		mov ebx, AREA_WIDTH
+		mul ebx
+		add eax, [ebp + arg2] ; x
+		shl eax, 2
+		add eax, area
+		
+		get_cell_number_macro [ebp + arg2], [ebp + arg3]
+		pop ebx ; y
+		pop eax ; x
+		; get_symbol_from_click_macro eax, ebx
+		; pop edx
+		pusha
+		push eax
+		push offset test_format
+		call printf
+		add esp, 8
+		popa
+		pusha
+		push ebx
+		push offset test_format
+		call printf
+		add esp, 8
+		popa
+		imul eax, CELL_WIDTH
+		imul ebx, CELL_HEIGHT
+		add eax, 110
+		add ebx, 100
+		
+		; add ebx, CELL_HEIGHT / 2
+		
+		make_text_macro '_', area, eax, ebx 
+		; pusha
+		; push ebx
+		; push offset test_format
+		; call printf
+		; add esp, 8
+		; popa
+		
+		; mov dword ptr [eax], RED
+		; mov dword ptr [eax - 4], RED
+		; mov dword ptr [eax + 4], RED
+		; mov dword ptr [eax - 4 * AREA_WIDTH], RED
+		; mov dword ptr [eax + 4 * AREA_WIDTH], RED
+		
+		
+		
 		; mov eax, [ebp + arg3]
 		; mov ebx, _WIDTH
 		; mul ebx		; eax = y * _WIDTH
@@ -396,7 +488,7 @@ draw_proc proc
 		; mov dword ptr [eax - 4 * _WIDTH], ROSU
 		; mov dword ptr [eax + 4 * _WIDTH], ROSU
 		
-		;draw_horizontal_line_macro [ebp + arg2], [ebp + arg3], 30, ROSU
+		; draw_horizontal_line_macro [ebp + arg2], [ebp + arg3], 30, RED
 		;draw_vertical_line_macro [ebp + arg2], [ebp + arg3], 30, ROSU
 		;draw_square_macro [ebp + arg2], [ebp + arg3], 30, ROSU
 		
@@ -458,17 +550,17 @@ draw_proc proc
 		make_text_macro edx, area, 10, 10
 		
 		
-		make_text_macro 'M', area, 300, 20
-		make_text_macro 'I', area, 310, 20
-		make_text_macro 'N', area, 320, 20
-		make_text_macro 'E', area, 330, 20
-		make_text_macro 'S', area, 340, 20
-		make_text_macro 'W', area, 350, 20
-		make_text_macro 'E', area, 360, 20
-		make_text_macro 'E', area, 370, 20
-		make_text_macro 'P', area, 380, 20
-		make_text_macro 'E', area, 390, 20
-		make_text_macro 'R', area, 400, 20
+		make_text_macro 'M', area, 350, 20
+		make_text_macro 'I', area, 360, 20
+		make_text_macro 'N', area, 370, 20
+		make_text_macro 'E', area, 380, 20
+		make_text_macro 'S', area, 390, 20
+		make_text_macro 'W', area, 400, 20
+		make_text_macro 'E', area, 410, 20
+		make_text_macro 'E', area, 420, 20
+		make_text_macro 'P', area, 430, 20
+		make_text_macro 'E', area, 440, 20
+		make_text_macro 'R', area, 450, 20
 	
 	
 	
