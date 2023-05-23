@@ -18,8 +18,10 @@ eax_format db "eax = %d ", 0
 test_format db "test = %d ", 0
 format db "%d ", 0
 new_line_format db " ", 0Ah, 0
+x_format db "x = %d ", 0
+y_format db "y = %d", 0
 
-_WINDOW_TITLE DB "Minesweeper", 0
+WINDOW_TITLE DB "Minesweeper", 0
 AREA_WIDTH EQU 800
 AREA_HEIGHT EQU 600
 
@@ -34,13 +36,10 @@ arg4 EQU 20
 symbol_width EQU 10
 symbol_height EQU 20
 
-RED EQU 0FF0000h
 BLACK EQU 0
 
+int_to_string db '0', 0
 
-buton_x EQU 300
-buton_y EQU 300
-button_size EQU 100
 
 MATRIX_X EQU 100
 MATRIX_Y EQU 100
@@ -50,8 +49,8 @@ number_of_horizontal_cells EQU 20
 number_of_vertical_cells EQU 20
 matrix DD 0
 
-dir dd -4, -84, -80, -76, 4, 84, 80, 76
 
+include digit.inc
 include digits.inc
 include letters.inc
 include mine.inc
@@ -64,8 +63,10 @@ include mine.inc
 ; arg4 - pos_y
 
 
-make_matrix_proc macro numberOfMines, _height, _width
+make_matrix_proc macro numberOfMines
 	local i_loop, j_loop, check, assign_mines_loop, i_assign_values_loop, j_assign_values_loop, loop_test, west, north_west, north, north_east, east, south_east, south, south_west, skip
+	
+	
 	xor ecx, ecx
 	i_loop:
 		xor edx, edx
@@ -96,18 +97,10 @@ make_matrix_proc macro numberOfMines, _height, _width
 		next:
 		cmp ecx, numberOfMines
 		jl assign_mines_loop
-		
-		
-	; mov dword ptr [dir], -4
-	; mov dword ptr [dir + 4], -84
-	; mov dword ptr [dir + 8], -60
-	; mov dword ptr [dir + 12], -76
-	; mov dword ptr [dir + 16], 4
-	; mov dword ptr [dir + 20], 84
-	; mov dword ptr [dir + 24], 80
-	; mov dword ptr [dir + 28], 76
 	
-	mov dword ptr [matrix + 19*4], -1
+		
+	
+	; mov dword ptr [matrix + 19*4], -1
 	
 	xor ecx, ecx
 	i_assign_values_loop:
@@ -241,7 +234,7 @@ make_text proc
 	push ebp
 	mov ebp, esp
 	pusha
-	
+	xor eax, eax
 	mov eax, [ebp+arg1] ; citim simbolul de afisat
 	cmp eax, 'A'
 	jl make_digit
@@ -255,6 +248,11 @@ make_digit:
 	jl make_space
 	cmp eax, '9'
 	jg make_space
+	cmp eax, '9'
+	jle bug
+	sub eax, '0'
+	lea esi, digit
+	bug:
 	sub eax, '0'
 	lea esi, digits
 	jmp draw_text
@@ -305,12 +303,6 @@ simbol_pixel_next:
 	pop ebp
 	ret
 make_text endp
-
-draw_on_center macro start_x, start_y, end_x, end_y
-	local
-	
-
-endm
 
 ; un macro ca sa apelam mai usor desenarea simbolului
 make_text_macro macro symbol, drawArea, x, y
@@ -371,32 +363,39 @@ get_cell_number_macro macro x, y
 	div ebx
 	
 	push eax
-	; pusha
-	; push eax
-	; push offset test_format
-	; call printf
-	; add esp, 8
-	; popa
-	
 endm
 
 get_symbol_from_click_macro macro x_cell, y_cell
+	push eax
+	push ebx
 	
 	mov eax, x_cell
 	imul eax, 4
 	mov ebx, y_cell
-	imul ebx, 4
+	imul ebx, 4 * number_of_vertical_cells
 	add eax, ebx
+	
 	push eax
-	
-	
-	
 endm
 
 ; sau la fiecare interval de 200ms in care nu s-a dat click
 ; arg1 - evt (0 - initializare, 1 - click, 2 - s-a scurs intervalul fara click, 3 - s-a apasat o tasta)
 ; arg2 - x (in cazul apasarii unei taste, x contine codul ascii al tastei care a fost apasata)
 ; arg3 - y
+
+game_over_macro macro
+	
+	make_text_macro 'G', area, 350, 300
+	make_text_macro 'A', area, 360, 300
+	make_text_macro 'M', area, 370, 300
+	make_text_macro 'E', area, 380, 300
+	make_text_macro ' ', area, 390, 300
+	make_text_macro 'O', area, 400, 300
+	make_text_macro 'V', area, 410, 300
+	make_text_macro 'E', area, 420, 300
+	make_text_macro 'R', area, 430, 300
+	call exit
+endm
 
 draw_proc proc
 	push ebp
@@ -423,13 +422,17 @@ draw_proc proc
 		
 	click_event:
 	
-		; pusha
-		; push [ebp + arg2]
-		; push offset test_format
-		; call printf
-		; add esp, 8
-		; popa
+		mov eax, [ebp + arg2]
+		cmp eax, 100
+		jle afisare_litere
+		cmp eax, 700
+		jge afisare_litere
+
 		mov eax, [ebp + arg3] ; y
+		cmp eax, 100
+		jle afisare_litere
+		cmp eax, 500
+		jge afisare_litere
 		mov ebx, AREA_WIDTH
 		mul ebx
 		add eax, [ebp + arg2] ; x
@@ -439,88 +442,95 @@ draw_proc proc
 		get_cell_number_macro [ebp + arg2], [ebp + arg3]
 		pop ebx ; y
 		pop eax ; x
-		; get_symbol_from_click_macro eax, ebx
-		; pop edx
-		pusha
-		push eax
-		push offset test_format
-		call printf
-		add esp, 8
-		popa
-		pusha
-		push ebx
-		push offset test_format
-		call printf
-		add esp, 8
-		popa
+		
+		
+		
+		get_symbol_from_click_macro eax, ebx
+		
+		pop edx
+		pop ebx
+		pop eax
 		imul eax, CELL_WIDTH
 		imul ebx, CELL_HEIGHT
 		add eax, 110
 		add ebx, 100
 		
-		; add ebx, CELL_HEIGHT / 2
+		; pusha	
+		; mov ecx, eax
+		; mov edx, eax
+		; add edx, 30
 		
-		make_text_macro '_', area, eax, ebx 
 		; pusha
-		; push ebx
-		; push offset test_format
+		; push ecx
+		; push offset eax_format
 		; call printf
 		; add esp, 8
 		; popa
-		
-		; mov dword ptr [eax], RED
-		; mov dword ptr [eax - 4], RED
-		; mov dword ptr [eax + 4], RED
-		; mov dword ptr [eax - 4 * AREA_WIDTH], RED
-		; mov dword ptr [eax + 4 * AREA_WIDTH], RED
-		
-		
-		
-		; mov eax, [ebp + arg3]
-		; mov ebx, _WIDTH
-		; mul ebx		; eax = y * _WIDTH
-		; add eax, [ebp + arg2] ;		eax = y * _WIDTH + x
-		; shl eax, 2 ; 	eax = (y * _WIDTH + x) * 4
-		; add eax, area
-		; mov dword ptr [eax], ROSU
-		; mov dword ptr [eax - 4], ROSU
-		; mov dword ptr [eax + 4], ROSU
-		; mov dword ptr [eax - 4 * _WIDTH], ROSU
-		; mov dword ptr [eax + 4 * _WIDTH], ROSU
-		
-		; draw_horizontal_line_macro [ebp + arg2], [ebp + arg3], 30, RED
-		;draw_vertical_line_macro [ebp + arg2], [ebp + arg3], 30, ROSU
-		;draw_square_macro [ebp + arg2], [ebp + arg3], 30, ROSU
-		
-		; mov eax, [ebp + arg2]
-		; cmp eax, buton_x
-		; jl button_fail
-		; cmp eax, buton_x + button_size
-		; jg button_fail
-		; mov eax , [ebp + arg3]
-		; cmp eax, buton_y
-		; jl button_fail
-		; cmp eax, buton_y + button_size
-		; jg button_fail
-		
-		; make_text_macro ' ', area, 330, 400
-		; make_text_macro ' ', area, 340, 400
-		; make_text_macro ' ', area, 350, 400
-		; make_text_macro ' ', area, 360, 400
-		; make_text_macro 'O', area, 340, 400
-		; make_text_macro 'K', area, 350, 400
+		; pusha
+		; push edx
+		; push offset eax_format
+		; call printf
+		; add esp, 8
+		; popa
+		; draw_horizontal_line_macro 30, ebx, CELL_HEIGHT, 1434A4h
+		; draw_horizontal_line_macro 31, ebx, CELL_HEIGHT, 1434A4h
+		; draw_horizontal_line_macro 32, ebx, CELL_HEIGHT, 1434A4h
+		; add ecx, 5
+		; add edx, 5
+		; draw_horizontal_line_macro 100, 105, CELL_WIDTH, 3F00FFh
+		; loop_for_white:
+			; pusha
+			; draw_horizontal_line_macro ecx, ebx, CELL_HEIGHT, 3F00FFh
+			; popa
+			; inc ecx
+			; cmp ecx, edx
+			; jl loop_for_white
+		; popa	
 		
 		
-		; jmp afisare_litere
 		
-		; button_fail:
-		; make_text_macro ' ', area, 340, 400
-		; make_text_macro ' ', area, 350, 400
-		; make_text_macro 'F', area, 330, 400
-		; make_text_macro 'A', area, 340, 400
-		; make_text_macro 'I', area, 350, 400
-		; make_text_macro 'L', area, 360, 400
 		
+		
+		push eax
+		mov eax, dword ptr [matrix + edx]
+		add eax, '0'
+		mov dword ptr [int_to_string], eax
+		mov dword ptr [int_to_string + 1], 0 
+		pop eax
+		
+
+		pusha
+		push dword ptr [int_to_string]
+		push offset test_format
+		call printf
+		add esp, 8
+		popa
+		
+		
+		make_text_macro dword ptr [int_to_string], area, eax, ebx
+		cmp dword ptr [matrix + edx], -1
+		jne afisare_litere
+		game_over_macro
+		; call exit
+		
+		jmp afisare_litere
+		
+	bucla_linii:
+		mov eax, [ebp+arg2]
+		and eax, 0FFh
+		; provide a new (random) color
+		mul eax
+		mul eax
+		add eax, ecx
+		push ecx
+		mov ecx, area_width
+	bucla_coloane:
+		mov [edi], eax
+		add edi, 4
+		add eax, ebx
+		loop bucla_coloane
+		pop ecx
+		loop bucla_linii
 		jmp afisare_litere
 		
 	timer_event:
@@ -561,7 +571,17 @@ draw_proc proc
 		make_text_macro 'P', area, 430, 20
 		make_text_macro 'E', area, 440, 20
 		make_text_macro 'R', area, 450, 20
-	
+		
+	cmp counter, 1
+	jg afisare_linii_orizontale
+	mov ecx, 100
+	loop_for_color:
+		pusha
+		draw_vertical_line_macro ecx, MATRIX_Y, number_of_horizontal_cells * CELL_HEIGHT, 0c9e6f2h
+		popa
+		inc ecx
+		cmp ecx, 700
+		jl loop_for_color
 	
 	
 	afisare_linii_orizontale:
@@ -610,6 +630,7 @@ draw_proc proc
 		draw_vertical_line_macro 670, MATRIX_Y, number_of_horizontal_cells * CELL_HEIGHT, BLACK
 		draw_vertical_line_macro 700, MATRIX_Y, number_of_horizontal_cells * CELL_HEIGHT, BLACK
 		draw_vertical_line_macro 701, MATRIX_Y, number_of_horizontal_cells * CELL_HEIGHT + 2, BLACK
+		
 			
 	; afisare_linii_verticale:
 		; mov ecx, -1
@@ -627,15 +648,6 @@ draw_proc proc
 			; cmp ecx, number_of_horizontal_cells
 			; jl loop_for_vertical_lines
 		
-		
-; patrat:
-	; draw_horizontal_line_macro buton_x, buton_y, button_size, 0
-	; draw_horizontal_line_macro buton_x, buton_y + button_size, button_size, 0
-	;draw_vertical_line_macro buton_x, buton_y, button_size, 0
-	;draw_vertical_line_macro buton_x + button_size, buton_y, button_size, 0
-
-		
-	
 final_draw:
 	popa
 	mov esp, ebp
@@ -647,6 +659,7 @@ draw_proc endp
 
 start:
 
+	
 	mov eax, AREA_WIDTH
 	mov ebx, AREA_HEIGHT
 	mul ebx
@@ -656,7 +669,17 @@ start:
 	add ESP, 4
 	mov area, eax
 	
-	xor edx, edx
+	
+	; pusha
+	; push eax
+	; push offset test_format
+	; call printf
+	; add esp, 8
+	; popa
+
+	
+	
+	;xor edx, edx
 	mov eax, number_of_horizontal_cells
 	mov ebx, number_of_vertical_cells
 	mul ebx
@@ -664,52 +687,18 @@ start:
 	add esp, 4
 	mov matrix, eax
 	
-	; mov dir[0], -4 ; west
-	; mov eax, number_of_vertical_cells
-	; imul eax, 4
-	; neg eax
-	; sub eax, 4
-	; mov dir[1], eax ; north-west
-	; add eax, 4
-	; mov dir[2], eax ; north
-	; add eax, 4
-	; mov dir[3], eax ; north-east
-	; mov dir[4], 4 ; east
-	; mov eax, number_of_vertical_cells
-	; imul eax, 4
-	; add eax, 4
-	; mov dir[5], eax ; south-east
-	; sub eax, 4
-	; mov dir[6], eax	; south
-	; sub eax, 4
-	; mov dir[7], eax ; south-west
 	
-	
-	; pusha
-	; push dir[6]
-	; push offset format
-	; add esp, 8
-	; popa
 	
 	pusha
-	make_matrix_proc 60, 20, 20
+	make_matrix_proc 60
 	popa
-	
-	
-	; pusha
-	; push dword ptr [matrix + 181*4]
-	; push offset format
-	; call printf
-	; add esp, 8
-	; popa
-	
 	
 	
 	push offset draw_proc
 	push area
 	push AREA_HEIGHT
 	push AREA_WIDTH
-	push offset _WINDOW_TITLE
+	push offset WINDOW_TITLE
 	call BeginDrawing
 	add esp, 20
 	
